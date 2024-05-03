@@ -126,6 +126,13 @@ void printToTft(float temperature, float humidity, int quality) {
   tftDrawSmallRightPane(quality, changeColor(quality, 30, 50));
 }
 
+/*
+ * Print the temperature, humidity and weather to the TFT display
+ * Overloaded function, to print the weather instead of the air quality
+ * @param temperature - the temperature to print
+ * @param humidity - the humidity to print
+ * @param weather - the weather to print
+*/
 void printToTft(float temperature, float humidity, String weather) {
   tftDrawBigPane(temperature, changeColor(static_cast<int>(temperature), 22, 32));
   tftDrawSmallLeftPane(humidity, changeColor(static_cast<int>(humidity), 40, 60));
@@ -384,6 +391,10 @@ void printWifiStatus() {
 // Util functions
 // ========================================
 
+/*
+ * Get the mode as a string
+ * @param mode - the mode to check
+ */
 String getMode(bool mode) {
   if (mode == MODE_SENSOR) {
     return "inside";
@@ -392,14 +403,24 @@ String getMode(bool mode) {
   return "outside";
 }
 
+/*
+ * Deserialize the json response from the server
+ * @param response - the response to deserialize
+ */
 JsonDocument deserializeJsonResponse(String response) {
   JsonDocument doc;
   deserializeJson(doc, response);
   return doc;
 }
 
+/*
+ * Set the server reading to the global variables
+ */
 void setServerReading() {
-  http.get("/get-weather?lat=52.20&lon=8.04");
+  if(http.get("/get-weather?lat=52.20&lon=8.04") != 0) {
+    Serial.println("Error while reading from server");
+    setup();
+  }
   JsonDocument doc = deserializeJsonResponse(http.responseBody());
   server_city = static_cast<String>(doc["city"]);
   server_temp = doc["temperature"];
@@ -407,17 +428,29 @@ void setServerReading() {
   server_weather = static_cast<String>(doc["weather"]);
 }
 
-boolean isDelayOver (unsigned long &startOfPeriod, unsigned long TimePeriod) {
-  unsigned long currentMillis  = millis();
-  if ( currentMillis - startOfPeriod >= TimePeriod ) {
+/*
+ * Check if the delay is over
+  * @param startOfPeriod - the start of the period
+  * @param TimePeriod - the time period
+*/
+boolean isDelayOver(unsigned long &startOfPeriod, unsigned long TimePeriod)
+{
+  unsigned long currentMillis = millis();
+  if (currentMillis - startOfPeriod >= TimePeriod)
+  {
     // more time than TimePeriod has elapsed since last time if-condition was true
     startOfPeriod = currentMillis; // a new period starts right here so set new starttime
     return true;
   }
-  else return false;            // actual TimePeriod is NOT yet over
+  else
+    return false; // actual TimePeriod is NOT yet over
 }
 
-void resetColors() {
+/*
+ * Reset the colors of all panes
+ */
+void resetColors()
+{
   // reset colors
   color = ST77XX_BLUE;
   bigPaneColor = ST77XX_WHITE;
@@ -428,17 +461,21 @@ void resetColors() {
 // ========================================
 // Setup and Loop
 // ========================================
-void setup() {
-  Serial.begin(9600);  // Serielle Verbindung starten
+void setup()
+{
+  status = WL_IDLE_STATUS;
+  resetColors();
+
+  Serial.begin(9600); // Serielle Verbindung starten
   matrix.begin();
 
   tft.initR(INITR_GREENTAB);
   tft.fillScreen(ST77XX_BLACK);
 
   tftSetup();
-  dht.begin();  // DHT11 Sensor starten
+  dht.begin(); // DHT11 Sensor starten
 
-  pinMode(A0, INPUT);  // analog Air Quality Sensor
+  pinMode(A0, INPUT); // analog Air Quality Sensor
 
   tftStatusScreen();
 
@@ -474,6 +511,7 @@ void setup() {
 }
 
 void loop() {
+  status = WiFi.status();
   // read button input -> Switch mode when pressed
   if (!digitalRead(BUTTON_PIN)) {
     if (!buttonState) {
@@ -482,13 +520,15 @@ void loop() {
 
       resetColors();
     }
-  } else {
+  }
+  else {
     buttonState = false;
   }
 
   if (!mode) {
     massureAndPrint();
-  } else {
+  }
+  else {
     readAndPrintFromServer();
   }
 }
